@@ -1,15 +1,20 @@
 mod controller;
 mod model;
 
-use axum::{routing::get, Router};
+use axum::{
+    routing::{delete, get, post},
+    Router,
+};
 use mongodb::{error::Error as MongoError, options::ClientOptions, Client, Database};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
 fn app(db: Database) -> Router {
     Router::new()
-        .route("/books", get(controller::fetch_all))
-        .route("/books/:id", get(controller::fetch_one))
+        .route("/books", get(controller::book::fetch_all))
+        .route("/books/:id", get(controller::book::fetch_one))
+        .route("/books", post(controller::book::store))
+        .route("/books/:id", delete(controller::book::delete))
         .with_state(db)
 }
 
