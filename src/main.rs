@@ -2,7 +2,7 @@ mod controller;
 mod model;
 
 use axum::{
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use mongodb::{error::Error as MongoError, options::ClientOptions, Client, Database};
@@ -14,6 +14,7 @@ fn app(db: Database) -> Router {
         .route("/books", get(controller::book::fetch_all))
         .route("/books/:id", get(controller::book::fetch_one))
         .route("/books", post(controller::book::store))
+        .route("/books/:id", put(controller::book::update))
         .route("/books/:id", delete(controller::book::delete))
         .with_state(db)
 }

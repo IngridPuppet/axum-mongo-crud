@@ -43,21 +43,52 @@ pub async fn store(
 ) -> (StatusCode, Json<Value>) {
     let res = Book::collection(&db).insert_one(book.clone(), None).await;
 
-    if let Err(err) = res {
-        eprintln!("{}", err);
+    match res {
+        Ok(metadata) => match metadata.inserted_id {
+            Bson::ObjectId(oid) => (
+                StatusCode::OK,
+                Json(json!(Book {
+                    id: Some(oid),
+                    ..book
+                })),
+            ),
+            _ => unreachable!(),
+        },
+        Err(err) => {
+            eprintln!("{}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(Value::Null))
+        }
+    }
+}
 
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(Value::Null));
+pub async fn update(
+    State(db): State<Database>,
+    Path(book_id): Path<ObjectId>,
+    Json(book): Json<Book>,
+) -> (StatusCode, Json<Value>) {
+    if Some(book_id) != book.id {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!(String::from("resource id mismatch"))),
+        );
     }
 
-    match res.unwrap().inserted_id {
-        Bson::ObjectId(oid) => (
-            StatusCode::OK,
-            Json(json!(Book {
-                id: Some(oid),
-                ..book
-            })),
-        ),
-        _ => unreachable!(),
+    let res = Book::collection(&db)
+        .update_one(doc! {"_id": book_id}, doc! {"$set": book.to_bson()}, None)
+        .await;
+
+    match res {
+        Ok(metadata) => {
+            if metadata.modified_count > 0 {
+                (StatusCode::OK, Json(json!(book)))
+            } else {
+                (StatusCode::NOT_FOUND, Json(Value::Null))
+            }
+        }
+        Err(err) => {
+            eprintln!("{}", err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(Value::Null))
+        }
     }
 }
 
@@ -69,8 +100,8 @@ pub async fn delete(State(db): State<Database>, Path(book_id): Path<ObjectId>) -
         .deleted_count;
 
     if deleted_count > 0 {
-        StatusCode::OK
-    } else {
         StatusCode::NO_CONTENT
+    } else {
+        StatusCode::NOT_FOUND
     }
 }

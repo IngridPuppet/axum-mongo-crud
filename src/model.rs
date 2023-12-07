@@ -1,10 +1,20 @@
-use mongodb::{bson::oid::ObjectId, Collection, Database};
+use mongodb::{
+    bson::{self, oid::ObjectId, Document},
+    Collection, Database,
+};
 use serde::{Deserialize, Serialize};
 
 pub trait Model {
     fn collection(db: &Database) -> Collection<Self>
     where
         Self: Sized;
+
+    fn to_bson(&self) -> Document
+    where
+        Self: Serialize,
+    {
+        bson::to_document(self).unwrap()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
