@@ -1,5 +1,6 @@
 mod controller;
 mod model;
+mod repository;
 
 use axum::{
     routing::{delete, get, post, put},

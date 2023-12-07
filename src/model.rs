@@ -4,15 +4,10 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 
-pub trait Model {
-    fn collection(db: &Database) -> Collection<Self>
-    where
-        Self: Sized;
+pub trait Model: Sized + Serialize {
+    fn collection(db: &Database) -> Collection<Self>;
 
-    fn to_bson(&self) -> Document
-    where
-        Self: Serialize,
-    {
+    fn to_bson(&self) -> Document {
         bson::to_document(self).unwrap()
     }
 }
