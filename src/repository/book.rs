@@ -22,7 +22,6 @@ impl MongoBookRepository {
 
 #[async_trait]
 impl Repository<Book, ObjectId> for MongoBookRepository {
-
     async fn find_all(&self) -> Result<Vec<Book>, RepositoryError> {
         let mut books: Vec<Book> = vec![];
 
@@ -66,7 +65,7 @@ impl Repository<Book, ObjectId> for MongoBookRepository {
         let metadata = self
             .collection
             .update_one(
-                doc! {"_id": book.id.unwrap().clone()},
+                doc! {"_id": book.id.unwrap()},
                 doc! {"$set": book.to_bson()},
                 None,
             )
@@ -79,10 +78,7 @@ impl Repository<Book, ObjectId> for MongoBookRepository {
         }
     }
 
-    async fn delete_one(
-        &self,
-        book_id: ObjectId,
-    ) -> Result<(), RepositoryError> {
+    async fn delete_one(&self, book_id: ObjectId) -> Result<(), RepositoryError> {
         // Delete the book from the database
         let metadata = self
             .collection

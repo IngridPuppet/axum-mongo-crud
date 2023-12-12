@@ -78,10 +78,7 @@ pub async fn update(
 }
 
 // Delete a book by its ID
-pub async fn delete(
-    State(state): State<AppState>,
-    Path(book_id): Path<ObjectId>,
-) -> StatusCode {
+pub async fn delete(State(state): State<AppState>, Path(book_id): Path<ObjectId>) -> StatusCode {
     match state.book_repository.delete_one(book_id).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(err) => match err {
