@@ -41,6 +41,13 @@ pub async fn store(
     State(state): State<AppState>,
     Json(book): Json<Book>,
 ) -> (StatusCode, Json<Value>) {
+    if book.id.is_some() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!(String::from("resource must not specify id"))),
+        );
+    }
+
     match state.book_repository.store(book).await {
         Ok(book) => (StatusCode::OK, Json(json!(book))),
         Err(err) => {
