@@ -5,14 +5,14 @@ use mongodb::{
     Collection, Database,
 };
 
-use super::{Repository, RepositoryStatus};
+use super::{Repository, RepositoryError};
 use crate::model::{Book, Model};
 
-pub struct BookRepository {
+pub struct MongoBookRepository {
     collection: Collection<Book>,
 }
 
-impl BookRepository {
+impl MongoBookRepository {
     pub fn from_db(db: &Database) -> Self {
         Self {
             collection: db.collection("books"),
@@ -21,10 +21,9 @@ impl BookRepository {
 }
 
 #[async_trait]
-impl Repository<Book> for BookRepository {
-    type RepositoryError = MongoError;
+impl Repository<Book, ObjectId> for MongoBookRepository {
 
-    async fn find_all(&self) -> Result<Vec<Book>, Self::RepositoryError> {
+    async fn find_all(&self) -> Result<Vec<Book>, RepositoryError> {
         let mut books: Vec<Book> = vec![];
 
         // Retrieve all books from the database
@@ -36,7 +35,7 @@ impl Repository<Book> for BookRepository {
         Ok(books)
     }
 
-    async fn find_one(&self, book_id: ObjectId) -> Result<Option<Book>, Self::RepositoryError> {
+    async fn find_one(&self, book_id: ObjectId) -> Result<Option<Book>, RepositoryError> {
         // Query the database for the specified book ID
         Ok(self
             .collection
@@ -44,20 +43,23 @@ impl Repository<Book> for BookRepository {
             .await?)
     }
 
-    async fn store(&self, book: Book) -> Result<ObjectId, Self::RepositoryError> {
+    async fn store(&self, book: Book) -> Result<Book, RepositoryError> {
         // Insert the new book into the database
         let metadata = self.collection.insert_one(book.clone(), None).await?;
 
         // Return persisted book
         Ok(match metadata.inserted_id {
-            Bson::ObjectId(oid) => oid,
+            Bson::ObjectId(oid) => Book {
+                id: Some(oid),
+                ..book
+            },
             _ => unreachable!(),
         })
     }
 
-    async fn update(&self, book: Book) -> Result<RepositoryStatus, Self::RepositoryError> {
+    async fn update(&self, book: Book) -> Result<Book, RepositoryError> {
         if book.id.is_none() {
-            return Err(MongoError::custom(RepositoryStatus::MissingIdentifier));
+            return Err(RepositoryError::MissingIdentifier);
         }
 
         // Update the book in the database
@@ -70,13 +72,33 @@ impl Repository<Book> for BookRepository {
             )
             .await?;
 
-        Ok(RepositoryStatus::Done)
+        if metadata.matched_count > 0 {
+            Ok(book)
+        } else {
+            Err(RepositoryError::TargetNotFound)
+        }
     }
 
     async fn delete_one(
         &self,
         book_id: ObjectId,
-    ) -> Result<RepositoryStatus, Self::RepositoryError> {
-        Ok(RepositoryStatus::Done)
+    ) -> Result<(), RepositoryError> {
+        // Delete the book from the database
+        let metadata = self
+            .collection
+            .delete_one(doc! {"_id": book_id}, None)
+            .await?;
+
+        if metadata.deleted_count > 0 {
+            Ok(())
+        } else {
+            Err(RepositoryError::TargetNotFound)
+        }
+    }
+}
+
+impl From<MongoError> for RepositoryError {
+    fn from(error: MongoError) -> Self {
+        RepositoryError::Generic(error.to_string())
     }
 }

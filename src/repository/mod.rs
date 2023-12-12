@@ -1,28 +1,26 @@
-mod book;
-
-use std::default;
+pub mod book;
 
 use async_trait::async_trait;
-use mongodb::bson::oid::ObjectId;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename = "lowercase")]
-pub enum RepositoryStatus {
-    Done,
+#[derive(Debug, Serialize, Deserialize, Error)]
+pub enum RepositoryError {
+    #[error("generic: {0}")]
+    Generic(String),
+    #[error("missing identifier")]
     MissingIdentifier,
+    #[error("target not found")]
     TargetNotFound,
 }
 
 #[async_trait]
-pub trait Repository<Model>: Sized {
-    type RepositoryError;
+pub trait Repository<Model, ModelKeyType>: Sync + Send {
+    async fn find_all(&self) -> Result<Vec<Model>, RepositoryError>;
+    async fn find_one(&self, model_id: ModelKeyType) -> Result<Option<Model>, RepositoryError>;
 
-    async fn find_all(&self) -> Result<Vec<Model>, Self::RepositoryError>;
-    async fn find_one(&self, model_id: ObjectId) -> Result<Option<Model>, Self::RepositoryError>;
+    async fn store(&self, model: Model) -> Result<Model, RepositoryError>;
+    async fn update(&self, model: Model) -> Result<Model, RepositoryError>;
 
-    async fn store(&self, model: Model) -> Result<ObjectId, Self::RepositoryError>;
-    async fn update(&self, model: Model) -> Result<RepositoryStatus, Self::RepositoryError>;
-
-    async fn delete_one(&self, model_id: ObjectId) -> Result<RepositoryStatus, Self::RepositoryError>;
+    async fn delete_one(&self, model_id: ModelKeyType) -> Result<(), RepositoryError>;
 }

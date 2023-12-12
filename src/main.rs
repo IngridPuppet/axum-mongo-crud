@@ -6,18 +6,27 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
-use mongodb::{error::Error as MongoError, options::ClientOptions, Client, Database};
-use std::net::SocketAddr;
+use model::Book;
+use mongodb::{
+    bson::oid::ObjectId, error::Error as MongoError, options::ClientOptions, Client, Database,
+};
+use repository::{book::MongoBookRepository, Repository};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 
-fn app(db: Database) -> Router {
+#[derive(Clone)]
+pub struct AppState {
+    book_repository: Arc<dyn Repository<Book, ObjectId>>,
+}
+
+fn app(state: AppState) -> Router {
     Router::new()
         .route("/books", get(controller::book::fetch_all))
         .route("/books/:id", get(controller::book::fetch_one))
         .route("/books", post(controller::book::store))
         .route("/books/:id", put(controller::book::update))
         .route("/books/:id", delete(controller::book::delete))
-        .with_state(db)
+        .with_state(state)
 }
 
 #[tokio::main]
@@ -28,13 +37,18 @@ async fn main() {
     // Set up MongoDB connection
     let db = config_mongo().await.expect("failed to connect to database");
 
+    // Build app state
+    let state = AppState {
+        book_repository: Arc::new(MongoBookRepository::from_db(&db)),
+    };
+
     // Set up server address
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("server listening on {}", addr);
 
     // Serve app
     let listener = TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app(db)).await.unwrap();
+    axum::serve(listener, app(state)).await.unwrap();
 }
 
 async fn config_mongo() -> Result<Database, MongoError> {
