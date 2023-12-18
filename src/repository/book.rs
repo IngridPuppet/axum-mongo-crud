@@ -6,7 +6,7 @@ use mongodb::{
 };
 
 use super::{Repository, RepositoryError};
-use crate::model::{Book, Model};
+use crate::model::Book;
 
 pub struct MongoBookRepository {
     collection: Collection<Book>,
